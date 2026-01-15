@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Results and outputs
+results/
+*.csv
+*.png
+*.jpg
+
+# Model weights
+*.pt
+*.pth
+*.ckpt
+*.bin
+
+# Data
+*.tar
+*.zip
+*.npy
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+.DS_Store
+*.log
