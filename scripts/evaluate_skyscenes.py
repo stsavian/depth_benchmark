@@ -134,14 +134,21 @@ def main():
     print("\nRunning evaluation...")
     benchmark = DepthBenchmark(model, dataset, config)
 
-    # Evaluate with grouping by altitude and pitch
-    results_df = benchmark.evaluate_by_condition(
-        group_by=["altitude", "pitch"],
-        progress=True,
-    )
+    # Run evaluation once and get per-sample results
+    overall_metrics, per_sample_df = benchmark.evaluate(progress=True)
 
-    # Also get overall metrics
-    overall_metrics, per_sample_df = benchmark.evaluate(progress=False)
+    # Group by altitude and pitch
+    results_df = per_sample_df.groupby(["altitude", "pitch"]).agg(
+        {
+            "abs_rel": ["mean", "std", "count"],
+            "sq_rel": ["mean", "std"],
+            "rmse": ["mean", "std"],
+            "delta_1": ["mean", "std"],
+            "gt_depth_mean": ["mean", "min", "max"],
+        }
+    )
+    results_df.columns = ["_".join(col).strip() for col in results_df.columns.values]
+    results_df = results_df.reset_index()
 
     # Print results
     print("\n" + "=" * 60)
@@ -152,13 +159,14 @@ def main():
     display_cols = [
         "altitude",
         "pitch",
+        "gt_depth_mean_mean",
         "abs_rel_mean",
         "rmse_mean",
         "delta_1_mean",
         "abs_rel_count",
     ]
     display_df = results_df[display_cols].copy()
-    display_df.columns = ["Alt", "Pitch", "AbsRel", "RMSE", "δ<1.25", "N"]
+    display_df.columns = ["Alt", "Pitch", "GT_Depth", "AbsRel", "RMSE", "δ<1.25", "N"]
     print(display_df.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
 
     print("\n" + "=" * 60)

@@ -133,10 +133,19 @@ class DepthBenchmark:
 
             accumulator.update(metrics)
 
+            # Compute GT depth statistics (valid pixels only)
+            valid_gt = gt_depth[mask.astype(bool) & (gt_depth > self.config.min_depth) & (gt_depth < self.config.max_depth)]
+            gt_depth_mean = float(np.mean(valid_gt)) if len(valid_gt) > 0 else 0.0
+            gt_depth_min = float(np.min(valid_gt)) if len(valid_gt) > 0 else 0.0
+            gt_depth_max = float(np.max(valid_gt)) if len(valid_gt) > 0 else 0.0
+
             # Store per-sample results
             result = {
                 "index": idx,
                 **metrics.to_dict(),
+                "gt_depth_mean": gt_depth_mean,
+                "gt_depth_min": gt_depth_min,
+                "gt_depth_max": gt_depth_max,
                 "scale": scale,
                 "shift": shift,
                 **metadata,
@@ -180,6 +189,7 @@ class DepthBenchmark:
                 "delta_2": ["mean", "std"],
                 "delta_3": ["mean", "std"],
                 "silog": ["mean", "std"],
+                "gt_depth_mean": ["mean", "min", "max"],
             }
         )
 

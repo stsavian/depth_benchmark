@@ -35,3 +35,7 @@ python scripts/evaluate_skyscenes.py \
     --output results/ \
     --max-samples 50  # Quick test with fewer samples
 ```
+
+## Dataset Note
+
+SkyScenes includes slight jitter in height values (Δh ~ N(1, 2.5m)) to simulate realistic UAV actuation imperfections.
