@@ -1,0 +1,43 @@
+# Default configuration for depth benchmark
+
+# Dataset configuration
+dataset:
+  name: "custom"  # Dataset name (custom, kitti, nyu, etc.)
+  root: "/path/to/dataset"
+  split: "test"
+  max_samples: null  # Limit number of samples (null = all)
+
+# Model configuration
+model:
+  name: "depth_anything_v2"
+  checkpoint: null  # Path to model checkpoint
+  device: "cuda"
+
+# Evaluation settings
+evaluation:
+  batch_size: 1
+  num_workers: 4
+  metrics:
+    - "abs_rel"
+    - "sq_rel"
+    - "rmse"
+    - "rmse_log"
+    - "delta_1"
+    - "delta_2"
+    - "delta_3"
+    - "silog"
+
+  # Depth range for evaluation
+  min_depth: 0.001
+  max_depth: 80.0
+
+  # Whether to align predictions (scale/shift invariant evaluation)
+  align_prediction: true
+  alignment_method: "least_squares"  # least_squares, median, mean
+
+# Output configuration
+output:
+  save_dir: "./results"
+  save_predictions: false
+  save_visualizations: true
+  visualization_samples: 10  # Number of samples to visualize
