@@ -53,7 +53,7 @@ for pngfile in $(find "$DATASET_ROOT" -name "*.png" -type f 2>/dev/null); do
     fi
 done
 
-# Handle .tar.gz files
+# Handle .tar.gz files (try both gzip and plain tar)
 echo ""
 echo "Scanning for .tar.gz files..."
 
@@ -63,7 +63,8 @@ for archive in $(find "$DATASET_ROOT" -name "*.tar.gz" -type f 2>/dev/null); do
 
     rm -rf "$TEMP_DIR"/*
 
-    if tar -xzf "$archive" -C "$TEMP_DIR"; then
+    # Try gzip first, then plain tar
+    if tar -xzf "$archive" -C "$TEMP_DIR" 2>/dev/null || tar -xf "$archive" -C "$TEMP_DIR"; then
         for src in $(find "$TEMP_DIR" -name "*.png" -type f); do
             mv "$src" "$target_dir/"
         done
