@@ -1,17 +1,35 @@
 #!/bin/bash
 # Download SkyScenes dataset from Hugging Face
-# Usage: bash scripts/download_skyscenes.sh /path/to/download/folder
+# Usage: bash scripts/download_skyscenes.sh [options]
 #
 # Options:
+#   --path PATH      Download/extract path (default: ./SkyScenes)
 #   --images-only    Download only RGB images
 #   --depth-only     Download only depth maps
 #   --all            Download images + depth (default)
+#   --no-extract     Skip extraction after download
+#   --extract-only   Only extract existing archives (no download)
 
 set -e
 
 # Default settings
-DOWNLOAD_FOLDER="${1:-./SkyScenes}"
-MODE="${2:---all}"
+DOWNLOAD_FOLDER="./SkyScenes"
+MODE="all"
+EXTRACT=true
+EXTRACT_ONLY=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --path) DOWNLOAD_FOLDER="$2"; shift 2 ;;
+        --images-only) MODE="images"; shift ;;
+        --depth-only) MODE="depth"; shift ;;
+        --all) MODE="all"; shift ;;
+        --no-extract) EXTRACT=false; shift ;;
+        --extract-only) EXTRACT_ONLY=true; shift ;;
+        *) shift ;;
+    esac
+done
 
 # Height and Pitch variations (12 total)
 HP=('H_15_P_0' 'H_15_P_45' 'H_15_P_60' 'H_15_P_90' 'H_35_P_0' 'H_35_P_45' 'H_35_P_60' 'H_35_P_90' 'H_60_P_0' 'H_60_P_45' 'H_60_P_60' 'H_60_P_90')
@@ -82,10 +100,53 @@ echo ""
 echo "=============================================="
 echo "Download complete!"
 echo "=============================================="
+
+# Extract archives if requested
+if [ "$EXTRACT" = true ]; then
+    echo ""
+    echo "Extracting tar.gz archives..."
+    echo "=============================================="
+
+    extract_archives() {
+        local data_type=$1
+        for hp in "${HP[@]}"; do
+            for town in "${TOWNS[@]}"; do
+                # For depth, only ClearNoon exists
+                if [ "$data_type" = "Depth" ]; then
+                    weather_list=("ClearNoon")
+                else
+                    weather_list=("${WEATHER_IMAGES[@]}")
+                fi
+
+                for weather in "${weather_list[@]}"; do
+                    archive="${DOWNLOAD_FOLDER}/${data_type}/${hp}/${weather}/${town}/${town}.tar.gz"
+                    target_dir="${DOWNLOAD_FOLDER}/${data_type}/${hp}/${weather}/${town}"
+
+                    if [ -f "$archive" ]; then
+                        echo "[EXTRACT] $data_type / $hp / $weather / $town"
+                        tar -xzf "$archive" -C "$target_dir" --strip-components=8 2>/dev/null || \
+                        tar -xzf "$archive" -C "$target_dir" --strip-components=7 2>/dev/null || \
+                        tar -xzf "$archive" -C "$target_dir" 2>/dev/null
+                        rm "$archive"
+                    fi
+                done
+            done
+        done
+    }
+
+    case "$MODE" in
+        --images-only) extract_archives "Images" ;;
+        --depth-only) extract_archives "Depth" ;;
+        --all|*)
+            extract_archives "Images"
+            extract_archives "Depth"
+            ;;
+    esac
+
+    echo ""
+    echo "Extraction complete!"
+fi
+
 echo ""
-echo "Next steps:"
-echo "  1. Extract the archives:"
-echo "     bash scripts/extract_skyscenes.sh $DOWNLOAD_FOLDER"
-echo ""
-echo "  2. Run benchmark:"
-echo "     python scripts/evaluate_skyscenes.py --dataset $DOWNLOAD_FOLDER"
+echo "Run benchmark:"
+echo "  python scripts/evaluate_skyscenes.py --dataset $DOWNLOAD_FOLDER"
