@@ -1,100 +1,105 @@
 #!/bin/bash
-# Script to extract SkyScenes tar archives
-# The dataset downloads files as .png but they are actually tar archives
+# Extract SkyScenes dataset archives
+# Handles both:
+#   - .tar.gz files (from HuggingFace download)
+#   - .png files that are actually tar archives (legacy format)
+#
+# Usage: bash scripts/extract_skyscenes.sh /path/to/SkyScenes
 
-DATASET_ROOT="${1:-/home/ssavian/DATASETS/SkyScenes}"
-TEMP_DIR="/tmp/skyscenes_extract"
+DATASET_ROOT="${1:-./SkyScenes}"
+TEMP_DIR="/tmp/skyscenes_extract_$$"
 
-echo "Extracting SkyScenes dataset from: $DATASET_ROOT"
-echo "================================================"
+echo "=============================================="
+echo "SkyScenes Extractor"
+echo "=============================================="
+echo "Dataset path: $DATASET_ROOT"
+echo "=============================================="
 
-# Function to check if file is a tar archive
+# Cleanup temp on exit
+trap "rm -rf $TEMP_DIR" EXIT
+
 is_tar() {
-    file "$1" | grep -q "tar archive"
+    file "$1" 2>/dev/null | grep -q "tar archive"
 }
 
-# Function to extract tar file with correct path handling
-extract_tar() {
+# Extract .tar.gz archive
+extract_targz() {
+    local archive="$1"
+    local target_dir="$2"
+
+    echo "[EXTRACT] $archive"
+    mkdir -p "$TEMP_DIR"
+
+    # Try extraction with different strip levels (archives have nested paths)
+    tar -xzf "$archive" -C "$TEMP_DIR" 2>/dev/null || tar -xf "$archive" -C "$TEMP_DIR" 2>/dev/null
+
+    # Move all PNG files to target, flattening structure
+    find "$TEMP_DIR" -name "*.png" -type f -exec mv {} "$target_dir/" \; 2>/dev/null
+
+    rm -rf "$TEMP_DIR"/*
+    rm -f "$archive"
+}
+
+# Extract .png file that is actually a tar archive
+extract_fake_png() {
     local tar_file="$1"
     local target_dir="$2"
 
-    echo "Extracting: $tar_file"
-
-    # Create temp extraction directory
     mkdir -p "$TEMP_DIR"
-
-    # Extract to temp
     tar -xf "$tar_file" -C "$TEMP_DIR" 2>/dev/null
 
-    # Find the extracted files and move them to the correct location
-    # The tar contains full paths like: srv/hoffman-lab/flash9/.../filename.png
-    # We need to strip the prefix and keep just the filename
-    find "$TEMP_DIR" -name "*.png" -type f | while read src_file; do
-        filename=$(basename "$src_file")
-        mv "$src_file" "$target_dir/$filename" 2>/dev/null
-    done
+    find "$TEMP_DIR" -name "*.png" -type f -exec mv {} "$target_dir/" \; 2>/dev/null
 
-    # Remove the tar file (which is named .png)
-    rm "$tar_file"
-
-    # Cleanup temp
-    rm -rf "$TEMP_DIR"
+    rm -rf "$TEMP_DIR"/*
+    rm -f "$tar_file"
 }
 
-# Process Images folder
-echo ""
-echo "Processing Images folder..."
-echo "----------------------------"
-for hp_dir in "$DATASET_ROOT"/Images/H_*_P_*/; do
-    for weather_dir in "$hp_dir"*/; do
-        for town_dir in "$weather_dir"*/; do
-            # Check first file in directory
-            first_file=$(ls "$town_dir"*.png 2>/dev/null | head -1)
-            if [ -n "$first_file" ] && is_tar "$first_file"; then
-                echo "Found tar archives in: $town_dir"
-                for tar_file in "$town_dir"*.png; do
-                    if is_tar "$tar_file"; then
-                        extract_tar "$tar_file" "$town_dir"
-                    fi
-                done
-            fi
-        done
-    done
-done
+# Process each data type
+for data_type in Images Depth; do
+    echo ""
+    echo "Processing $data_type..."
+    echo "----------------------------"
 
-# Process Depth folder
-echo ""
-echo "Processing Depth folder..."
-echo "----------------------------"
-for hp_dir in "$DATASET_ROOT"/Depth/H_*_P_*/; do
-    for weather_dir in "$hp_dir"*/; do
-        for town_dir in "$weather_dir"*/; do
-            # Check first file in directory
-            first_file=$(ls "$town_dir"*.png 2>/dev/null | head -1)
-            if [ -n "$first_file" ] && is_tar "$first_file"; then
-                echo "Found tar archives in: $town_dir"
-                for tar_file in "$town_dir"*.png; do
-                    if is_tar "$tar_file"; then
-                        extract_tar "$tar_file" "$town_dir"
-                    fi
-                done
-            fi
-        done
-    done
+    data_dir="$DATASET_ROOT/$data_type"
+    [ ! -d "$data_dir" ] && echo "  Not found: $data_dir" && continue
+
+    # 1. Extract .tar.gz files
+    while IFS= read -r archive; do
+        [ -z "$archive" ] && continue
+        target_dir=$(dirname "$archive")
+        extract_targz "$archive" "$target_dir"
+    done < <(find "$data_dir" -name "*.tar.gz" -type f 2>/dev/null)
+
+    # 2. Extract .png files that are actually tar archives
+    while IFS= read -r town_dir; do
+        [ -z "$town_dir" ] && continue
+        first_png=$(find "$town_dir" -maxdepth 1 -name "*.png" -type f 2>/dev/null | head -1)
+        if [ -n "$first_png" ] && is_tar "$first_png"; then
+            echo "[EXTRACT] tar-as-png in: $town_dir"
+            for tar_file in "$town_dir"/*.png; do
+                [ -f "$tar_file" ] && is_tar "$tar_file" && extract_fake_png "$tar_file" "$town_dir"
+            done
+        fi
+    done < <(find "$data_dir" -type d -name "Town*" 2>/dev/null)
 done
 
 echo ""
+echo "=============================================="
 echo "Extraction complete!"
-echo "===================="
+echo "=============================================="
 
-# Verify extraction
+# Verify
 echo ""
-echo "Verifying extraction..."
-for hp_dir in "$DATASET_ROOT"/Images/H_*_P_*/; do
-    hp_name=$(basename "$hp_dir")
-    sample=$(find "$hp_dir" -name "*.png" -type f 2>/dev/null | head -1)
+echo "Verification:"
+for data_type in Images Depth; do
+    data_dir="$DATASET_ROOT/$data_type"
+    [ ! -d "$data_dir" ] && continue
+    count=$(find "$data_dir" -name "*.png" -type f 2>/dev/null | wc -l)
+    sample=$(find "$data_dir" -name "*.png" -type f 2>/dev/null | head -1)
     if [ -n "$sample" ]; then
         ftype=$(file "$sample" | grep -o "PNG image data" || echo "NOT PNG")
-        echo "$hp_name Images: $ftype"
+        echo "  $data_type: $count files ($ftype)"
+    else
+        echo "  $data_type: no PNG files found"
     fi
 done
