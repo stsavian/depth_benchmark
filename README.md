@@ -5,17 +5,27 @@ Benchmark monocular depth estimation models on aerial imagery (SkyScenes dataset
 ## Setup
 
 ```bash
+conda env create -f environment.yml
 conda activate depth_benchmark
 pip install -e .
+```
+
+## Download SkyScenes
+
+```bash
+# Download dataset from HuggingFace (images + depth)
+bash scripts/download_skyscenes.sh --path /path/to/SkyScenes
+
+# Or download only depth maps (smaller)
+bash scripts/download_skyscenes.sh --path /path/to/SkyScenes --depth-only
+
+# Extract existing archives (if downloaded separately)
+bash scripts/extract_skyscenes.sh /path/to/SkyScenes
 ```
 
 ## Quick Start
 
 ```bash
-# Extract SkyScenes tar archives (run once)
-bash scripts/extract_skyscenes.sh /path/to/SkyScenes
-
-# Run benchmark
 python scripts/evaluate_skyscenes.py --dataset /path/to/SkyScenes --model moge
 ```
 

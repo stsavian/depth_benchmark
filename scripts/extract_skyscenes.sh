@@ -24,75 +24,61 @@ cleanup() {
 }
 trap cleanup EXIT
 
-extracted=0
-failed=0
-
-# Find all .png files and check if they're tar archives
+# Find all .png files that are tar archives
 echo ""
-echo "Scanning for tar archives..."
+echo "Scanning for tar archives disguised as .png..."
 
-while IFS= read -r -d '' pngfile; do
-    # Check if file is a tar archive
+for pngfile in $(find "$DATASET_ROOT" -name "*.png" -type f 2>/dev/null); do
     filetype=$(file -b "$pngfile" 2>/dev/null)
 
     if echo "$filetype" | grep -qi "tar archive\|POSIX tar"; then
         target_dir=$(dirname "$pngfile")
-        basename_file=$(basename "$pngfile")
-
         echo "Extracting: $pngfile"
 
         # Clear temp
         rm -rf "$TEMP_DIR"/*
 
-        # Extract tar
-        if tar -xf "$pngfile" -C "$TEMP_DIR" 2>/dev/null; then
+        # Extract tar (show errors)
+        if tar -xf "$pngfile" -C "$TEMP_DIR"; then
             # Move all extracted PNGs to target dir
-            find "$TEMP_DIR" -name "*.png" -type f | while read src; do
-                mv "$src" "$target_dir/" 2>/dev/null
+            for src in $(find "$TEMP_DIR" -name "*.png" -type f); do
+                mv "$src" "$target_dir/"
             done
-
             # Remove the tar file
             rm -f "$pngfile"
-            extracted=$((extracted + 1))
+            echo "  OK"
         else
-            echo "  FAILED to extract: $pngfile"
-            failed=$((failed + 1))
+            echo "  FAILED"
         fi
     fi
-done < <(find "$DATASET_ROOT" -name "*.png" -type f -print0 2>/dev/null)
+done
 
-# Also handle .tar.gz files
+# Handle .tar.gz files
 echo ""
 echo "Scanning for .tar.gz files..."
 
-while IFS= read -r -d '' archive; do
+for archive in $(find "$DATASET_ROOT" -name "*.tar.gz" -type f 2>/dev/null); do
     target_dir=$(dirname "$archive")
     echo "Extracting: $archive"
 
     rm -rf "$TEMP_DIR"/*
 
-    if tar -xzf "$archive" -C "$TEMP_DIR" 2>/dev/null; then
-        find "$TEMP_DIR" -name "*.png" -type f | while read src; do
-            mv "$src" "$target_dir/" 2>/dev/null
+    if tar -xzf "$archive" -C "$TEMP_DIR"; then
+        for src in $(find "$TEMP_DIR" -name "*.png" -type f); do
+            mv "$src" "$target_dir/"
         done
         rm -f "$archive"
-        extracted=$((extracted + 1))
+        echo "  OK"
     else
-        echo "  FAILED: $archive"
-        failed=$((failed + 1))
+        echo "  FAILED"
     fi
-done < <(find "$DATASET_ROOT" -name "*.tar.gz" -type f -print0 2>/dev/null)
-
-echo ""
-echo "=============================================="
-echo "Extraction Summary"
-echo "=============================================="
-echo "Extracted: $extracted archives"
-echo "Failed: $failed archives"
+done
 
 # Verify
 echo ""
-echo "Verification:"
+echo "=============================================="
+echo "Verification"
+echo "=============================================="
 for dtype in Images Depth; do
     dpath="$DATASET_ROOT/$dtype"
     [ ! -d "$dpath" ] && continue
@@ -109,8 +95,4 @@ for dtype in Images Depth; do
 done
 
 echo ""
-if [ "$failed" -eq 0 ]; then
-    echo "SUCCESS!"
-else
-    echo "Completed with $failed errors"
-fi
+echo "Done!"
