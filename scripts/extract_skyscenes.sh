@@ -1,105 +1,116 @@
 #!/bin/bash
-# Extract SkyScenes dataset archives
-# Handles both:
-#   - .tar.gz files (from HuggingFace download)
-#   - .png files that are actually tar archives (legacy format)
-#
+# Extract SkyScenes dataset
+# Handles .png files that are actually tar archives (HuggingFace download format)
 # Usage: bash scripts/extract_skyscenes.sh /path/to/SkyScenes
 
-DATASET_ROOT="${1:-./SkyScenes}"
-TEMP_DIR="/tmp/skyscenes_extract_$$"
+DATASET_ROOT="${1:-.}"
 
 echo "=============================================="
 echo "SkyScenes Extractor"
+echo "Path: $DATASET_ROOT"
 echo "=============================================="
-echo "Dataset path: $DATASET_ROOT"
-echo "=============================================="
 
-# Cleanup temp on exit
-trap "rm -rf $TEMP_DIR" EXIT
+if [ ! -d "$DATASET_ROOT" ]; then
+    echo "ERROR: Directory not found: $DATASET_ROOT"
+    exit 1
+fi
 
-is_tar() {
-    file "$1" 2>/dev/null | grep -q "tar archive"
+# Create temp dir
+TEMP_DIR=$(mktemp -d)
+echo "Temp dir: $TEMP_DIR"
+
+cleanup() {
+    rm -rf "$TEMP_DIR"
 }
+trap cleanup EXIT
 
-# Extract .tar.gz archive
-extract_targz() {
-    local archive="$1"
-    local target_dir="$2"
+extracted=0
+failed=0
 
-    echo "[EXTRACT] $archive"
-    mkdir -p "$TEMP_DIR"
+# Find all .png files and check if they're tar archives
+echo ""
+echo "Scanning for tar archives..."
 
-    # Try extraction with different strip levels (archives have nested paths)
-    tar -xzf "$archive" -C "$TEMP_DIR" 2>/dev/null || tar -xf "$archive" -C "$TEMP_DIR" 2>/dev/null
+while IFS= read -r -d '' pngfile; do
+    # Check if file is a tar archive
+    filetype=$(file -b "$pngfile" 2>/dev/null)
 
-    # Move all PNG files to target, flattening structure
-    find "$TEMP_DIR" -name "*.png" -type f -exec mv {} "$target_dir/" \; 2>/dev/null
+    if echo "$filetype" | grep -qi "tar archive\|POSIX tar"; then
+        target_dir=$(dirname "$pngfile")
+        basename_file=$(basename "$pngfile")
 
-    rm -rf "$TEMP_DIR"/*
-    rm -f "$archive"
-}
+        echo "Extracting: $pngfile"
 
-# Extract .png file that is actually a tar archive
-extract_fake_png() {
-    local tar_file="$1"
-    local target_dir="$2"
+        # Clear temp
+        rm -rf "$TEMP_DIR"/*
 
-    mkdir -p "$TEMP_DIR"
-    tar -xf "$tar_file" -C "$TEMP_DIR" 2>/dev/null
-
-    find "$TEMP_DIR" -name "*.png" -type f -exec mv {} "$target_dir/" \; 2>/dev/null
-
-    rm -rf "$TEMP_DIR"/*
-    rm -f "$tar_file"
-}
-
-# Process each data type
-for data_type in Images Depth; do
-    echo ""
-    echo "Processing $data_type..."
-    echo "----------------------------"
-
-    data_dir="$DATASET_ROOT/$data_type"
-    [ ! -d "$data_dir" ] && echo "  Not found: $data_dir" && continue
-
-    # 1. Extract .tar.gz files
-    while IFS= read -r archive; do
-        [ -z "$archive" ] && continue
-        target_dir=$(dirname "$archive")
-        extract_targz "$archive" "$target_dir"
-    done < <(find "$data_dir" -name "*.tar.gz" -type f 2>/dev/null)
-
-    # 2. Extract .png files that are actually tar archives
-    while IFS= read -r town_dir; do
-        [ -z "$town_dir" ] && continue
-        first_png=$(find "$town_dir" -maxdepth 1 -name "*.png" -type f 2>/dev/null | head -1)
-        if [ -n "$first_png" ] && is_tar "$first_png"; then
-            echo "[EXTRACT] tar-as-png in: $town_dir"
-            for tar_file in "$town_dir"/*.png; do
-                [ -f "$tar_file" ] && is_tar "$tar_file" && extract_fake_png "$tar_file" "$town_dir"
+        # Extract tar
+        if tar -xf "$pngfile" -C "$TEMP_DIR" 2>/dev/null; then
+            # Move all extracted PNGs to target dir
+            find "$TEMP_DIR" -name "*.png" -type f | while read src; do
+                mv "$src" "$target_dir/" 2>/dev/null
             done
+
+            # Remove the tar file
+            rm -f "$pngfile"
+            extracted=$((extracted + 1))
+        else
+            echo "  FAILED to extract: $pngfile"
+            failed=$((failed + 1))
         fi
-    done < <(find "$data_dir" -type d -name "Town*" 2>/dev/null)
-done
+    fi
+done < <(find "$DATASET_ROOT" -name "*.png" -type f -print0 2>/dev/null)
+
+# Also handle .tar.gz files
+echo ""
+echo "Scanning for .tar.gz files..."
+
+while IFS= read -r -d '' archive; do
+    target_dir=$(dirname "$archive")
+    echo "Extracting: $archive"
+
+    rm -rf "$TEMP_DIR"/*
+
+    if tar -xzf "$archive" -C "$TEMP_DIR" 2>/dev/null; then
+        find "$TEMP_DIR" -name "*.png" -type f | while read src; do
+            mv "$src" "$target_dir/" 2>/dev/null
+        done
+        rm -f "$archive"
+        extracted=$((extracted + 1))
+    else
+        echo "  FAILED: $archive"
+        failed=$((failed + 1))
+    fi
+done < <(find "$DATASET_ROOT" -name "*.tar.gz" -type f -print0 2>/dev/null)
 
 echo ""
 echo "=============================================="
-echo "Extraction complete!"
+echo "Extraction Summary"
 echo "=============================================="
+echo "Extracted: $extracted archives"
+echo "Failed: $failed archives"
 
 # Verify
 echo ""
 echo "Verification:"
-for data_type in Images Depth; do
-    data_dir="$DATASET_ROOT/$data_type"
-    [ ! -d "$data_dir" ] && continue
-    count=$(find "$data_dir" -name "*.png" -type f 2>/dev/null | wc -l)
-    sample=$(find "$data_dir" -name "*.png" -type f 2>/dev/null | head -1)
+for dtype in Images Depth; do
+    dpath="$DATASET_ROOT/$dtype"
+    [ ! -d "$dpath" ] && continue
+
+    count=$(find "$dpath" -name "*.png" -type f 2>/dev/null | wc -l)
+    sample=$(find "$dpath" -name "*.png" -type f 2>/dev/null | head -1)
+
     if [ -n "$sample" ]; then
-        ftype=$(file "$sample" | grep -o "PNG image data" || echo "NOT PNG")
-        echo "  $data_type: $count files ($ftype)"
+        ftype=$(file -b "$sample" | head -c 30)
+        echo "$dtype: $count files ($ftype)"
     else
-        echo "  $data_type: no PNG files found"
+        echo "$dtype: 0 files"
     fi
 done
+
+echo ""
+if [ "$failed" -eq 0 ]; then
+    echo "SUCCESS!"
+else
+    echo "Completed with $failed errors"
+fi
