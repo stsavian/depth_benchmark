@@ -13,7 +13,7 @@
 set -e
 
 # Default settings
-DOWNLOAD_FOLDER="./SkyScenes"
+DOWNLOAD_FOLDER="/davinci-1/home/ssavian/DATASETS/SkyScenes"
 MODE="all"
 EXTRACT=true
 EXTRACT_ONLY=false
@@ -32,15 +32,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Height and Pitch variations (12 total)
-HP=('H_15_P_0' 'H_15_P_45' 'H_15_P_60' 'H_15_P_90' 'H_35_P_0' 'H_35_P_45' 'H_35_P_60' 'H_35_P_90' 'H_60_P_0' 'H_60_P_45' 'H_60_P_60' 'H_60_P_90')
-
+#HP=('H_15_P_0' 'H_15_P_45' 'H_15_P_60' 'H_15_P_90' 'H_35_P_0' 'H_35_P_45' 'H_35_P_60' 'H_35_P_90' 'H_60_P_0' 'H_60_P_45' 'H_60_P_60' 'H_60_P_90')
+HP=('H_15_P_0' 'H_15_P_45' )
 # Weather conditions (depth only uses ClearNoon)
 WEATHER_IMAGES=('ClearNoon' 'ClearNight' 'ClearSunset' 'CloudyNoon' 'MidRainyNoon')
+WEATHER_IMAGES=('ClearNoon' )
 WEATHER_DEPTH=('ClearNoon')
 
 # Town layouts
-TOWNS=('Town01' 'Town02' 'Town03' 'Town04' 'Town05' 'Town06' 'Town07' 'Town10HD')
-
+#TOWNS=('Town01' 'Town02' 'Town03' 'Town04' 'Town05' 'Town06' 'Town07' 'Town10HD')
+TOWNS=('Town01')
 # Base URL
 BASE_URL="https://huggingface.co/datasets/hoffman-lab/SkyScenes/resolve/main"
 
@@ -147,6 +148,6 @@ if [ "$EXTRACT" = true ]; then
     echo "Extraction complete!"
 fi
 
-echo ""
-echo "Run benchmark:"
-echo "  python scripts/evaluate_skyscenes.py --dataset $DOWNLOAD_FOLDER"
+# echo ""
+# echo "Run benchmark:"
+# echo "  /opt/conda/envs/depth_benchmark/bin/python scripts/evaluate_skyscenes.py --dataset $DOWNLOAD_FOLDER"
