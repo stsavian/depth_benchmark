@@ -25,72 +25,58 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Track processed directories to avoid re-extracting identical tars
-declare -A processed_dirs
-
 # Find all .png files that are tar archives
 echo ""
 echo "Scanning for tar archives disguised as .png..."
 
-# Use while read to handle filenames with spaces
-find "$DATASET_ROOT" -name "*.png" -type f 2>/dev/null | while read -r pngfile; do
-    filetype=$(file -b "$pngfile" 2>/dev/null)
+# Get list of directories containing tar-disguised-as-png files
+tar_png_dirs=$(find "$DATASET_ROOT" -name "*.png" -type f -exec sh -c 'file -b "$1" | grep -qi "tar archive\|POSIX tar" && dirname "$1"' _ {} \; 2>/dev/null | sort -u)
 
-    if echo "$filetype" | grep -qi "tar archive\|POSIX tar"; then
-        target_dir=$(dirname "$pngfile")
+for target_dir in $tar_png_dirs; do
+    [ -z "$target_dir" ] && continue
 
-        # Check if we already processed this directory
-        if [ -f "$target_dir/.extracted" ]; then
-            # Just remove this duplicate tar
-            rm -f "$pngfile"
-            continue
+    # Find the first tar-png in this directory
+    first_tar=""
+    for f in "$target_dir"/*.png; do
+        [ -f "$f" ] || continue
+        if file -b "$f" 2>/dev/null | grep -qi "tar archive\|POSIX tar"; then
+            first_tar="$f"
+            break
         fi
+    done
 
-        echo "Extracting: $pngfile"
-        echo "  Target: $target_dir"
+    [ -z "$first_tar" ] && continue
 
-        # Clear temp
-        rm -rf "$TEMP_DIR"/*
+    echo "Extracting: $first_tar"
+    echo "  Target: $target_dir"
 
-        # Extract tar with --strip-components to handle absolute paths
-        # The tar contains paths like: srv/hoffman-lab/.../SkyScenes/Images/.../file.png
-        # We need to extract just the .png files to the target directory
-        if tar -xf "$pngfile" -C "$TEMP_DIR" 2>/dev/null; then
-            # Find and move all extracted PNGs (handles nested absolute paths)
-            extracted_count=0
-            while IFS= read -r src; do
-                basename_file=$(basename "$src")
-                mv "$src" "$target_dir/$basename_file"
-                ((extracted_count++))
-            done < <(find "$TEMP_DIR" -name "*.png" -type f 2>/dev/null)
+    # Clear temp
+    rm -rf "$TEMP_DIR"/*
 
-            echo "  Extracted $extracted_count PNG files"
+    # Extract tar
+    if tar -xf "$first_tar" -C "$TEMP_DIR" 2>/dev/null; then
+        # Find and move all extracted PNGs (handles nested absolute paths)
+        extracted_count=0
+        while IFS= read -r src; do
+            basename_file=$(basename "$src")
+            mv "$src" "$target_dir/$basename_file"
+            ((extracted_count++))
+        done < <(find "$TEMP_DIR" -name "*.png" -type f 2>/dev/null)
 
-            # Mark directory as processed
-            touch "$target_dir/.extracted"
+        echo "  Extracted $extracted_count PNG files"
+        echo "  OK"
+    else
+        echo "  FAILED to extract"
+    fi
 
-            # Remove the tar file
-            rm -f "$pngfile"
-            echo "  OK"
-        else
-            echo "  FAILED to extract"
+    # Remove ALL tar-png files in this directory (including the one we extracted)
+    for f in "$target_dir"/*.png; do
+        [ -f "$f" ] || continue
+        if file -b "$f" 2>/dev/null | grep -qi "tar archive\|POSIX tar"; then
+            rm -f "$f"
         fi
-    fi
+    done
 done
-
-# Now remove all remaining tar-disguised-as-png files (duplicates)
-echo ""
-echo "Cleaning up duplicate tar files..."
-find "$DATASET_ROOT" -name "*.png" -type f 2>/dev/null | while read -r pngfile; do
-    filetype=$(file -b "$pngfile" 2>/dev/null)
-    if echo "$filetype" | grep -qi "tar archive\|POSIX tar"; then
-        echo "  Removing duplicate: $(basename "$pngfile")"
-        rm -f "$pngfile"
-    fi
-done
-
-# Clean up .extracted markers
-find "$DATASET_ROOT" -name ".extracted" -type f -delete 2>/dev/null
 
 # Handle .tar.gz files (try both gzip and plain tar)
 echo ""
