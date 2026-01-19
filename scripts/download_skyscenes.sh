@@ -32,16 +32,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Height and Pitch variations (12 total)
-#HP=('H_15_P_0' 'H_15_P_45' 'H_15_P_60' 'H_15_P_90' 'H_35_P_0' 'H_35_P_45' 'H_35_P_60' 'H_35_P_90' 'H_60_P_0' 'H_60_P_45' 'H_60_P_60' 'H_60_P_90')
-HP=('H_15_P_0' 'H_15_P_45' )
+HP=('H_15_P_0' 'H_15_P_45' 'H_15_P_60' 'H_15_P_90' 'H_35_P_0' 'H_35_P_45' 'H_35_P_60' 'H_35_P_90' 'H_60_P_0' 'H_60_P_45' 'H_60_P_60' 'H_60_P_90')
+#HP=('H_15_P_0' 'H_15_P_45' )
 # Weather conditions (depth only uses ClearNoon)
 WEATHER_IMAGES=('ClearNoon' 'ClearNight' 'ClearSunset' 'CloudyNoon' 'MidRainyNoon')
-WEATHER_IMAGES=('ClearNoon' )
+#WEATHER_IMAGES=('ClearNoon' )
 WEATHER_DEPTH=('ClearNoon')
 
 # Town layouts
-#TOWNS=('Town01' 'Town02' 'Town03' 'Town04' 'Town05' 'Town06' 'Town07' 'Town10HD')
-TOWNS=('Town01')
+TOWNS=('Town01' 'Town02' 'Town03' 'Town04' 'Town05' 'Town06' 'Town07' 'Town10HD')
+#TOWNS=('Town01')
 # Base URL
 BASE_URL="https://huggingface.co/datasets/hoffman-lab/SkyScenes/resolve/main"
 
