@@ -79,6 +79,20 @@ def parse_args():
         default=None,
         help="Filter by specific pitches (e.g., --pitches 0 45 90)",
     )
+    parser.add_argument(
+        "--weathers",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Filter by specific weather/time conditions (e.g., --weathers ClearNoon CloudyNoon)",
+    )
+    parser.add_argument(
+        "--towns",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Filter by specific towns (e.g., --towns Town01 Town02)",
+    )
     return parser.parse_args()
 
 
@@ -106,6 +120,8 @@ def main():
         root=args.dataset,
         altitudes=args.altitudes,
         pitches=args.pitches,
+        weathers=args.weathers,
+        towns=args.towns,
         max_samples=args.max_samples,
         max_depth=args.max_depth,
     )
