@@ -11,15 +11,15 @@
 #=============================================================================
 
 # Model to evaluate (options: moge, moge-vitl, moge-2-vitl, moge-2-vitl-normal)
-MODEL="moge-2-vitl"
+MODEL="moge-vitl"
 
 # Altitudes in meters (space-separated, or empty for all)
 # Available: 15 35 60
-ALTITUDES="60"
+ALTITUDES=""
 
 # Pitch angles in degrees (space-separated, or empty for all)
 # Available: 0 45 60 90
-PITCHES="45"
+PITCHES=""
 
 # Weather/time of day conditions (space-separated, or empty for all)
 # Available: ClearNoon, ClearSunset, CloudyNoon, CloudySunset, WetNoon, WetSunset, etc.
@@ -27,7 +27,7 @@ WEATHERS="ClearNoon"
 
 # Towns (space-separated, or empty for all)
 # Available: Town01, Town02, Town03, etc.
-TOWNS="Town01"
+TOWNS=""
 
 # Maximum number of samples (empty for all)
 MAX_SAMPLES=""
