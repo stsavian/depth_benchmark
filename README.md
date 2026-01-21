@@ -47,9 +47,16 @@ python scripts/evaluate_skyscenes.py \
 ## Segmentation Benchmarking
 
 ```bash
+# SegFormer (neural network)
 python scripts/evaluate_skyscenes_segmentation.py \
     --dataset /path/to/SkyScenes \
     --model segformer-b5-cityscapes \
+    --output results/
+
+# RANSAC (geometry-based, uses depth)
+python scripts/evaluate_skyscenes_segmentation.py \
+    --dataset /path/to/SkyScenes \
+    --model ransac \
     --output results/
 
 # Filter by altitude/pitch/town
@@ -65,4 +72,4 @@ python scripts/evaluate_skyscenes_segmentation.py \
 
 **Depth**: `moge`, `moge-2-vitl`
 
-**Segmentation**: `segformer-b0-cityscapes`, `segformer-b5-cityscapes`
+**Segmentation**: `segformer-b0-cityscapes`, `segformer-b5-cityscapes`, `ransac`

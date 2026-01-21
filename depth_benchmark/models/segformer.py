@@ -96,8 +96,12 @@ class SegFormerWrapper(BaseSegmentationModel):
             {i: f"class_{i}" for i in range(self._num_classes)},
         )
 
-    def predict(self, image: Image.Image) -> np.ndarray:
+    def predict(self, image: Image.Image, depth: Optional[np.ndarray] = None) -> np.ndarray:
         """Predict segmentation mask from RGB image.
+
+        Args:
+            image: PIL Image in RGB format.
+            depth: Optional depth map (not used by SegFormer, but required by interface).
 
         Returns:
             Segmentation mask (H, W) with class IDs.

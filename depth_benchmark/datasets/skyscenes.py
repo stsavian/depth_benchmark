@@ -71,14 +71,17 @@ class SkyScenesDataset(BaseDepthDataset):
         - P_0, P_45, P_60, P_90 = pitch angle in degrees (0=horizontal, 90=nadir)
     """
 
-    # Depth is stored as 8-bit grayscale
-    # Based on empirical analysis of the dataset:
-    # - Lower pixel values = closer distances
-    # - Pixel value 255 = invalid (sky/far)
-    # - Approximate scale: depth_meters ≈ pixel_value * 0.5 to 0.6
-    # - Implied max depth ~150m for pixel value 255
-    # Using scale factor of 0.55 as middle ground
-    DEPTH_SCALE = 0.55  # depth_meters = pixel_value * DEPTH_SCALE
+    # Depth is stored as 8-bit grayscale (linearized from CARLA 24-bit RGB encoding)
+    # Reference: https://carla.readthedocs.io/en/latest/ref_sensors/#depth-camera
+    # https://huggingface.co/datasets/hoffman-lab/SkyScenes/discussions/1
+    #
+    # Empirically verified scale by comparing depth values with known drone altitudes:
+    # - H_15_P_90 (nadir from 15m): median depth ~25m
+    # - H_35_P_90 (nadir from 35m): median depth ~41m
+    # - H_60_P_90 (nadir from 60m): median depth ~51m
+    # This suggests max_depth ~100m (pixel 255 = 100m or invalid/sky)
+    DEPTH_SCALE = 100.0 / 255.0  # depth_meters = pixel_value * DEPTH_SCALE (~0.39)
+    DEPTH_MAX_METERS = 100.0  # Maximum depth in meters
     DEPTH_INVALID = 255  # Pixel value for invalid/sky regions
 
     def __init__(
@@ -227,21 +230,21 @@ class SkyScenesDataset(BaseDepthDataset):
     def _load_depth(self, index: int) -> np.ndarray:
         """Load depth map from 8-bit grayscale PNG.
 
-        Based on empirical analysis of SkyScenes:
-        - depth_meters = pixel_value * DEPTH_SCALE (~0.55)
-        - pixel_value 255 = invalid (sky/far regions)
+        Converts pixel values to meters using CARLA-derived formula:
+        - depth_meters = pixel_value * (1000/255)
+        - pixel_value 255 = ~1000m (max range / sky, marked as 0 for invalid)
         """
         depth_path = self.samples[index]["depth_path"]
         depth_img = Image.open(depth_path)
 
-        # Convert to numpy
-        depth = np.array(depth_img, dtype=np.float32)
+        # Convert to numpy (keep original pixel values for threshold check)
+        depth_raw = np.array(depth_img, dtype=np.float32)
 
-        # Convert to meters using empirical scale factor
-        depth = depth * self.DEPTH_SCALE
+        # Convert to meters using CARLA-derived scale factor
+        depth = depth_raw * self.DEPTH_SCALE
 
-        # Mark invalid regions (originally 255) as 0
-        depth[depth >= self.DEPTH_INVALID * self.DEPTH_SCALE * 0.99] = 0.0
+        # Mark invalid regions (pixel value 255 = sky/max range) as 0
+        depth[depth_raw >= self.DEPTH_INVALID] = 0.0
 
         return depth
 

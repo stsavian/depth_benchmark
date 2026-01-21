@@ -13,6 +13,7 @@ from .segmentation_registry import (
     get_segmentation_model,
 )
 from .segformer import SegFormerWrapper
+from .ransac_segmentation import RANSACPlaneSegmentation
 
 __all__ = [
     # Depth
@@ -27,4 +28,5 @@ __all__ = [
     "register_segmentation_model",
     "get_segmentation_model",
     "SegFormerWrapper",
+    "RANSACPlaneSegmentation",
 ]

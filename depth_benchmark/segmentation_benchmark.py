@@ -124,8 +124,14 @@ class SegmentationBenchmark:
             gt_seg = sample["segmentation"].numpy()
             metadata = sample["metadata"]
 
+            # Get depth if available (for models like RANSAC that need it)
+            depth_np = None
+            if "depth" in sample:
+                depth_tensor = sample["depth"]
+                depth_np = depth_tensor.numpy() if hasattr(depth_tensor, 'numpy') else depth_tensor
+
             # Predict segmentation
-            pred_seg = self.model.predict(rgb_pil)
+            pred_seg = self.model.predict(rgb_pil, depth=depth_np)
 
             # Resize prediction if needed
             if pred_seg.shape != gt_seg.shape:

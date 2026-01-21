@@ -42,12 +42,7 @@ def parse_args():
         "--model",
         type=str,
         default="segformer-b5-cityscapes",
-        choices=[
-            "segformer",
-            "segformer-b0-cityscapes",
-            "segformer-b5-cityscapes",
-        ],
-        help="Segmentation model to evaluate",
+        help="Segmentation model to evaluate (segformer-b5-cityscapes, ransac, etc.)",
     )
     parser.add_argument(
         "--output",
@@ -138,8 +133,9 @@ def main():
     print(f"Model loaded: {model}")
 
     # Configure class mapping for Cityscapes models
+    # RANSAC outputs SkyScenes class IDs directly, no mapping needed
     pred_class_mapping = None
-    if "cityscapes" in args.model.lower():
+    if "cityscapes" in args.model.lower() or "segformer" in args.model.lower():
         pred_class_mapping = CITYSCAPES_TO_SKYSCENES_GROUND
         print(f"Using Cityscapes -> SkyScenes ground class mapping")
 

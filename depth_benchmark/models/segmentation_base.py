@@ -32,11 +32,13 @@ class BaseSegmentationModel(ABC):
         pass
 
     @abstractmethod
-    def predict(self, image: Image.Image) -> np.ndarray:
+    def predict(self, image: Image.Image, depth: Optional[np.ndarray] = None) -> np.ndarray:
         """Predict segmentation from a single RGB image.
 
         Args:
             image: PIL Image in RGB format.
+            depth: Optional depth map as numpy array (H, W). Some models (e.g., RANSAC)
+                   require depth for prediction.
 
         Returns:
             Segmentation mask as numpy array (H, W) with class IDs.
