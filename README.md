@@ -1,51 +1,68 @@
 # Depth Benchmark
 
-Benchmark monocular depth estimation models on aerial imagery (SkyScenes dataset).
+Benchmark monocular depth estimation and segmentation models on aerial imagery (SkyScenes dataset).
 
-## Setup
+## Installation
 
 ```bash
 conda env create -f environment.yml
 conda activate depth_benchmark
 pip install -e .
+
+# For segmentation (optional)
+pip install transformers
 ```
 
 ## Download SkyScenes
 
 ```bash
-# Download dataset from HuggingFace (images + depth)
+# Download images + depth
 bash scripts/download_skyscenes.sh --path /path/to/SkyScenes
 
-# Or download only depth maps (smaller)
-bash scripts/download_skyscenes.sh --path /path/to/SkyScenes --depth-only
-
-# Extract existing archives (if downloaded separately)
+# Extract archives
 bash scripts/extract_skyscenes.sh /path/to/SkyScenes
+
+# Download segmentation masks (ClearNoon only)
+bash scripts/download_skyscenes_segmentation.sh --path /path/to/SkyScenes
 ```
 
-## Quick Start
-
-```bash
-python scripts/evaluate_skyscenes.py --dataset /path/to/SkyScenes --model moge
-```
-
-## Scripts
-
-| Script | Description |
-|--------|-------------|
-| `scripts/evaluate_skyscenes.py` | Evaluate depth model on SkyScenes, grouped by altitude/pitch |
-| `scripts/extract_skyscenes.sh` | Extract SkyScenes tar archives to PNG files |
-
-## Key Options
+## Depth Benchmarking
 
 ```bash
 python scripts/evaluate_skyscenes.py \
     --dataset /path/to/SkyScenes \
     --model moge \
-    --output results/ \
-    --max-samples 50  # Quick test with fewer samples
+    --output results/
+
+# Filter by altitude/pitch/weather/town
+python scripts/evaluate_skyscenes.py \
+    --dataset /path/to/SkyScenes \
+    --model moge \
+    --altitudes 15 30 \
+    --pitches 0 -45 \
+    --weathers ClearNoon \
+    --towns Town01 Town02
 ```
 
-## Dataset Note
+## Segmentation Benchmarking
 
-SkyScenes includes slight jitter in height values (Δh ~ N(1, 2.5m)) to simulate realistic UAV actuation imperfections.
+```bash
+python scripts/evaluate_skyscenes_segmentation.py \
+    --dataset /path/to/SkyScenes \
+    --model segformer-b5-cityscapes \
+    --output results/
+
+# Filter by altitude/pitch/town
+python scripts/evaluate_skyscenes_segmentation.py \
+    --dataset /path/to/SkyScenes \
+    --model segformer-b5-cityscapes \
+    --altitudes 15 \
+    --pitches 0 \
+    --towns Town01
+```
+
+## Available Models
+
+**Depth**: `moge`, `moge-2-vitl`
+
+**Segmentation**: `segformer-b0-cityscapes`, `segformer-b5-cityscapes`
