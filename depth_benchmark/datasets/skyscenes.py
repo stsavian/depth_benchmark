@@ -5,10 +5,43 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+import torch
 from PIL import Image
 
 from .base import BaseDepthDataset
 from .registry import register_dataset
+
+
+# SkyScenes segmentation class definitions
+# RGB color -> class ID mapping
+SKYSCENES_COLOR_TO_CLASS = {
+    (0, 0, 0): 0,           # unlabeled
+    (70, 70, 70): 1,        # building
+    (190, 153, 153): 2,     # fence
+    (250, 170, 160): 3,     # other
+    (220, 20, 60): 4,       # pedestrian
+    (153, 153, 153): 5,     # pole
+    (157, 234, 50): 6,      # road_line
+    (128, 64, 128): 7,      # road
+    (244, 35, 232): 8,      # sidewalk
+    (107, 142, 35): 9,      # vegetation
+    (0, 0, 142): 10,        # vehicle
+    (102, 102, 156): 11,    # wall
+    (220, 220, 0): 12,      # traffic_sign
+    (70, 130, 180): 13,     # sky
+    (150, 100, 100): 14,    # ground
+    (150, 120, 90): 15,     # bridge
+    (230, 150, 140): 16,    # rail_track
+    (180, 165, 180): 17,    # guard_rail
+    (250, 170, 30): 18,     # traffic_light
+    (110, 190, 160): 19,    # static
+    (170, 120, 50): 20,     # dynamic
+    (45, 60, 150): 21,      # water
+    (145, 170, 100): 22,    # terrain
+}
+
+# Ground-like classes for combined ground evaluation
+SKYSCENES_GROUND_CLASSES = {7, 8, 14}  # road, sidewalk, ground
 
 
 @register_dataset("skyscenes")
@@ -27,6 +60,11 @@ class SkyScenesDataset(BaseDepthDataset):
                     {weather}/
                         {town}/
                             {frame_id}_depth.png
+            Segment/  (only for ClearNoon weather)
+                H_{altitude}_P_{pitch}/
+                    ClearNoon/
+                        {town}/
+                            {frame_id}_semantic_segmentation.png
 
     Altitude and pitch are encoded in folder names:
         - H_15, H_35, H_60 = altitude in meters
@@ -56,6 +94,7 @@ class SkyScenesDataset(BaseDepthDataset):
         max_samples: Optional[int] = None,
         min_depth: float = 0.1,
         max_depth: float = 1000.0,
+        load_segmentation: bool = False,
     ):
         """Initialize SkyScenes dataset.
 
@@ -71,13 +110,27 @@ class SkyScenesDataset(BaseDepthDataset):
             max_samples: Maximum samples to load.
             min_depth: Minimum valid depth in meters.
             max_depth: Maximum valid depth in meters.
+            load_segmentation: If True, also load segmentation masks.
+                              Note: Segmentation only available for ClearNoon weather.
         """
         self.altitudes = altitudes
         self.pitches = pitches
-        self.weathers = weathers
-        self.towns = towns
+        self.load_segmentation = load_segmentation
         self._min_depth = min_depth
         self._max_depth = max_depth
+
+        # Segmentation only available for ClearNoon
+        if load_segmentation:
+            if weathers is not None and "ClearNoon" not in weathers:
+                raise ValueError(
+                    "Segmentation masks only available for ClearNoon weather. "
+                    "Either set weathers=None or include 'ClearNoon'."
+                )
+            # Force ClearNoon only when loading segmentation
+            weathers = ["ClearNoon"]
+
+        self.weathers = weathers
+        self.towns = towns
 
         super().__init__(root, split, transform, depth_transform, max_samples)
 
@@ -192,6 +245,58 @@ class SkyScenesDataset(BaseDepthDataset):
 
         return depth
 
+    def _load_segmentation(self, index: int) -> Optional[np.ndarray]:
+        """Load segmentation mask for the given index.
+
+        Returns:
+            Segmentation mask as numpy array (H, W) with class IDs.
+            Returns None if segmentation not available or not requested.
+        """
+        if not self.load_segmentation:
+            return None
+
+        sample = self.samples[index]
+
+        # Construct segmentation path
+        # Segment/H_{alt}_P_{pitch}/ClearNoon/{town}/{frame_id}_semsegCarla_clrnoon.png
+        seg_path = (
+            self.root / "Segment"
+            / f"H_{sample['altitude']}_P_{sample['pitch']}"
+            / "ClearNoon"
+            / sample['town']
+            / f"{sample['frame_id']}_semsegCarla_clrnoon.png"
+        )
+
+        if not seg_path.exists():
+            return None
+
+        # Load as RGB and convert to class IDs
+        seg_img = Image.open(seg_path).convert("RGB")
+        seg_array = np.array(seg_img)
+
+        # Convert RGB to class ID using color lookup
+        class_mask = self._rgb_to_class_id(seg_array)
+
+        return class_mask
+
+    def _rgb_to_class_id(self, rgb_array: np.ndarray) -> np.ndarray:
+        """Convert RGB segmentation image to class ID mask.
+
+        Args:
+            rgb_array: RGB image (H, W, 3).
+
+        Returns:
+            Class ID mask (H, W).
+        """
+        h, w = rgb_array.shape[:2]
+        class_mask = np.zeros((h, w), dtype=np.int32)
+
+        for color, class_id in SKYSCENES_COLOR_TO_CLASS.items():
+            mask = np.all(rgb_array == color, axis=-1)
+            class_mask[mask] = class_id
+
+        return class_mask
+
     def get_metadata(self, index: int) -> Dict[str, Any]:
         sample = self.samples[index]
         return {
@@ -250,3 +355,26 @@ class SkyScenesDataset(BaseDepthDataset):
             "weathers": sorted(weathers),
             "towns": sorted(towns),
         }
+
+    def __getitem__(self, index: int) -> Dict[str, Any]:
+        """Get a sample from the dataset.
+
+        Returns:
+            Dictionary containing:
+                - 'rgb': RGB image as tensor (C, H, W)
+                - 'depth': Ground truth depth map as tensor (H, W)
+                - 'mask': Validity mask as tensor (H, W)
+                - 'metadata': Additional metadata dictionary
+                - 'index': Sample index
+                - 'segmentation': (optional) Segmentation mask as tensor (H, W)
+        """
+        # Call parent implementation
+        result = super().__getitem__(index)
+
+        # Add segmentation if requested
+        if self.load_segmentation:
+            segmentation = self._load_segmentation(index)
+            if segmentation is not None:
+                result["segmentation"] = torch.from_numpy(segmentation).long()
+
+        return result
