@@ -17,6 +17,7 @@ from .metrics.segmentation_metrics import (
     compute_binary_segmentation_metrics,
 )
 from .models.segmentation_base import BaseSegmentationModel
+from .models.base import BaseDepthModel
 
 
 # Cityscapes class IDs for ground-like surfaces
@@ -58,6 +59,7 @@ class SegmentationBenchmark:
         model: BaseSegmentationModel,
         dataset: BaseDepthDataset,
         config: Optional[SegmentationBenchmarkConfig] = None,
+        depth_model: Optional[BaseDepthModel] = None,
     ):
         """Initialize benchmark.
 
@@ -65,10 +67,13 @@ class SegmentationBenchmark:
             model: Segmentation model to evaluate.
             dataset: Dataset to evaluate on (must have load_segmentation=True).
             config: Benchmark configuration.
+            depth_model: Optional depth estimation model. If provided, predicted depth
+                        will be used instead of GT depth for models like RANSAC.
         """
         self.model = model
         self.dataset = dataset
         self.config = config or SegmentationBenchmarkConfig()
+        self.depth_model = depth_model
 
     def _map_predictions(self, pred: np.ndarray) -> np.ndarray:
         """Map model predictions to target class space if needed.
@@ -124,9 +129,14 @@ class SegmentationBenchmark:
             gt_seg = sample["segmentation"].numpy()
             metadata = sample["metadata"]
 
-            # Get depth if available (for models like RANSAC that need it)
+            # Get depth (for models like RANSAC that need it)
             depth_np = None
-            if "depth" in sample:
+            if self.depth_model is not None:
+                # Use predicted depth from depth model
+                pred_depth = self.depth_model.predict(rgb_pil)
+                depth_np = pred_depth
+            elif "depth" in sample:
+                # Use GT depth from dataset
                 depth_tensor = sample["depth"]
                 depth_np = depth_tensor.numpy() if hasattr(depth_tensor, 'numpy') else depth_tensor
 

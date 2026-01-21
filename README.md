@@ -53,10 +53,17 @@ python scripts/evaluate_skyscenes_segmentation.py \
     --model segformer-b5-cityscapes \
     --output results/
 
-# RANSAC (geometry-based, uses depth)
+# RANSAC (geometry-based, uses GT depth)
 python scripts/evaluate_skyscenes_segmentation.py \
     --dataset /path/to/SkyScenes \
     --model ransac \
+    --output results/
+
+# RANSAC with predicted depth from MoGe
+python scripts/evaluate_skyscenes_segmentation.py \
+    --dataset /path/to/SkyScenes \
+    --model ransac \
+    --depth-model moge \
     --output results/
 
 # Filter by altitude/pitch/town

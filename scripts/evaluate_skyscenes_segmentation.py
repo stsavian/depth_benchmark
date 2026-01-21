@@ -83,6 +83,12 @@ def parse_args():
         default=None,
         help="Filter by specific towns",
     )
+    parser.add_argument(
+        "--depth-model",
+        type=str,
+        default=None,
+        help="Depth model for RANSAC (e.g., 'moge'). If not specified, uses GT depth.",
+    )
     return parser.parse_args()
 
 
@@ -106,6 +112,7 @@ def main():
     print(f"Dataset: {args.dataset}")
     print(f"Model: {args.model}")
     print(f"Device: {args.device}")
+    print(f"Depth source: {args.depth_model if args.depth_model else 'GT depth'}")
     print(f"Target classes: {SKYSCENES_GROUND_CLASSES} (road + sidewalk + ground)")
     print("=" * 60)
 
@@ -139,6 +146,15 @@ def main():
         pred_class_mapping = CITYSCAPES_TO_SKYSCENES_GROUND
         print(f"Using Cityscapes -> SkyScenes ground class mapping")
 
+    # Load depth model if specified
+    depth_model = None
+    if args.depth_model:
+        from depth_benchmark.models.registry import get_model
+        print(f"\nLoading depth model: {args.depth_model}...")
+        depth_model = get_model(args.depth_model, device=args.device)
+        depth_model.load()
+        print(f"Depth model loaded: {depth_model}")
+
     # Configure benchmark
     config = SegmentationBenchmarkConfig(
         target_classes=SKYSCENES_GROUND_CLASSES,
@@ -149,7 +165,7 @@ def main():
 
     # Run benchmark
     print("\nRunning evaluation...")
-    benchmark = SegmentationBenchmark(model, dataset, config)
+    benchmark = SegmentationBenchmark(model, dataset, config, depth_model=depth_model)
 
     overall_metrics, per_sample_df = benchmark.evaluate(progress=True)
 
