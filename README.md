@@ -19,11 +19,11 @@ pip install transformers
 # Download images + depth
 bash scripts/download_skyscenes.sh --path /path/to/SkyScenes
 
-# Extract archives
-bash scripts/extract_skyscenes.sh /path/to/SkyScenes
-
 # Download segmentation masks (ClearNoon only)
 bash scripts/download_skyscenes_segmentation.sh --path /path/to/SkyScenes
+
+# Extract all archives (images, depth, segmentation)
+bash scripts/extract_skyscenes.sh /path/to/SkyScenes
 ```
 
 ## Depth Benchmarking
