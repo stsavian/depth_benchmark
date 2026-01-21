@@ -11,7 +11,7 @@
 set -e
 
 # Default settings
-DOWNLOAD_FOLDER="/davinci-1/home/ssavian/DATASETS/SkyScenes"
+DOWNLOAD_FOLDER="/home/mariagraziam/Dataset"
 EXTRACT=true
 
 # Parse arguments
@@ -24,13 +24,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Height and Pitch variations (12 total)
-HP=('H_15_P_0' 'H_15_P_45' 'H_15_P_60' 'H_15_P_90' 'H_35_P_0' 'H_35_P_45' 'H_35_P_60' 'H_35_P_90' 'H_60_P_0' 'H_60_P_45' 'H_60_P_60' 'H_60_P_90')
+#HP=('H_15_P_0' 'H_15_P_45' 'H_15_P_60' 'H_15_P_90' 'H_35_P_0' 'H_35_P_45' 'H_35_P_60' 'H_35_P_90' 'H_60_P_0' 'H_60_P_45' 'H_60_P_60' 'H_60_P_90')
+HP=('H_15_P_0' 'H_15_P_45' )
 
 # Segmentation only available for ClearNoon
 WEATHER_SEGMENT=('ClearNoon')
 
 # Town layouts
-TOWNS=('Town01' 'Town02' 'Town03' 'Town04' 'Town05' 'Town06' 'Town07' 'Town10HD')
+#TOWNS=('Town01' 'Town02' 'Town03' 'Town04' 'Town05' 'Town06' 'Town07' 'Town10HD')
+TOWNS=('Town01')
 
 # Base URL
 BASE_URL="https://huggingface.co/datasets/hoffman-lab/SkyScenes/resolve/main"
